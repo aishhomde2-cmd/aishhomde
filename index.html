@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#173F35">
+<title>نظام الحضور والانصراف</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF1EE; --surface:#fff; --sunk:#F4F7F5;
+  --ink:#14241F; --ink-2:#3A4B45; --muted:#63746D; --line:#D7E0DB; --line-2:#E7EDEA;
+  --pri:#1C5A4A; --pri-h:#154738; --pri-soft:#E1EEE8;
+  --board:#173F35; --chalk:#F3F6EF; --chalk-dim:#A8C1B6;
+  --ok:#1B6F45; --ok-bg:#DDF1E5;
+  --warn:#875700; --warn-bg:#FAEDD2;
+  --bad:#A63726; --bad-bg:#FAE4DF;
+  --info:#255682; --info-bg:#E1EBF5;
+  --r1:8px; --r2:12px; --r3:18px;
+  --shadow:0 1px 2px rgba(20,36,31,.06),0 8px 22px -12px rgba(20,36,31,.18);
+  --font:'IBM Plex Sans Arabic','Segoe UI',Tahoma,system-ui,sans-serif;
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box}
+*{margin:0;padding:0}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.6;min-height:100vh;min-height:100dvh;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+.num{font-variant-numeric:tabular-nums}
+:focus-visible{outline:3px solid rgba(28,90,74,.45);outline-offset:2px}
+
+/* أزرار */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 18px;border-radius:var(--r2);background:var(--pri);color:#fff;font-weight:600;font-size:14.5px;white-space:nowrap;transition:background-color .15s,transform .05s}
+.btn:hover{background:var(--pri-h)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.btn.ghost{background:var(--surface);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+.btn.ghost:hover{background:var(--sunk)}
+.btn.danger{background:var(--bad)}
+.btn.danger:hover{background:#8C2D1F}
+.btn.sm{min-height:34px;padding:0 12px;font-size:13.5px;border-radius:var(--r1)}
+.btn.lg{min-height:56px;font-size:17px;border-radius:14px}
+.btn.block{width:100%}
+.btn svg{width:18px;height:18px;flex:none}
+.btn.sm svg{width:16px;height:16px}
+.icon-btn{width:34px;height:34px;display:inline-grid;place-items:center;border-radius:var(--r1);color:var(--muted);transition:background-color .15s,color .15s}
+.icon-btn:hover{background:var(--sunk);color:var(--ink)}
+.icon-btn:disabled{opacity:.3;cursor:not-allowed;background:none}
+.icon-btn.danger:hover{background:var(--bad-bg);color:var(--bad)}
+.icon-btn svg{width:18px;height:18px}
+.link{color:var(--pri);font-weight:600;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;font-size:inherit}
+.spin{width:17px;height:17px;border:2px solid currentColor;border-inline-end-color:transparent;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* حقول */
+.f{margin-bottom:14px}
+.f label,.lbl{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+.hint{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.6}
+.f input,.f select,.f textarea{width:100%;min-height:44px;padding:9px 12px;border:1px solid var(--line);border-radius:var(--r2);background:var(--surface);font-size:15px;transition:border-color .15s,box-shadow .15s}
+.f input:focus,.f select:focus,.f textarea:focus,.in:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px rgba(28,90,74,.16)}
+.f input:disabled,.f select:disabled{background:var(--sunk);color:var(--muted)}
+input[dir=ltr]{text-align:left}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 140px;gap:12px}
+@media(max-width:560px){.row2,.row3{grid-template-columns:1fr}}
+.in-wrap{display:flex;gap:8px}
+.in-wrap input{flex:1}
+.in{min-height:36px;padding:4px 10px;border:1px solid var(--line);border-radius:var(--r1);background:var(--surface);font-size:14px}
+.alert{padding:10px 14px;border-radius:var(--r2);font-size:14px;line-height:1.7;margin-bottom:14px;white-space:pre-line;background:var(--bad-bg);color:var(--bad)}
+.alert.ok{background:var(--ok-bg);color:var(--ok)}
+.note{font-size:13.5px;color:var(--muted);margin-bottom:14px;line-height:1.7}
+
+/* شاشة البدء */
+.boot{min-height:100vh;min-height:100dvh;display:grid;place-items:center;color:var(--muted);text-align:center;padding:24px}
+.boot .spin{width:28px;height:28px;color:var(--pri)}
+
+/* دخول الإدارة */
+.auth{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px 16px}
+.auth-card{width:100%;max-width:400px;background:var(--surface);border-radius:var(--r3);padding:30px 26px 24px;box-shadow:var(--shadow)}
+.brand{display:flex;align-items:center;gap:12px;margin-bottom:22px}
+.brand-mk{width:46px;height:46px;border-radius:13px;background:var(--pri);color:#fff;display:grid;place-items:center;flex:none}
+.brand-mk svg{width:24px;height:24px}
+.brand h1{font-size:18px;font-weight:700;line-height:1.35}
+.brand p{font-size:13.5px;color:var(--muted)}
+.auth-links{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:14px;font-size:13.5px;min-height:22px}
+.divider{border-top:1px solid var(--line-2);margin:20px 0 16px}
+
+/* واجهة الإدارة */
+.topbar{position:sticky;top:0;z-index:20;background:rgba(255,255,255,.94);backdrop-filter:saturate(1.4) blur(8px);-webkit-backdrop-filter:saturate(1.4) blur(8px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
+.topbar-in{max-width:1120px;margin:auto;padding:12px 20px 2px;display:flex;align-items:center;gap:14px}
+.t-school{font-weight:700;font-size:17px;line-height:1.3}
+.t-year{font-size:12.5px;color:var(--muted)}
+.t-user{margin-inline-start:auto;display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--muted)}
+.nav{max-width:1120px;margin:auto;padding:0 12px;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav button{padding:11px 12px 10px;font-weight:600;font-size:14px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.nav button:hover{color:var(--ink)}
+.nav button[aria-current=page]{color:var(--pri);border-bottom-color:var(--pri)}
+.main{max-width:1120px;margin:auto;padding:20px 20px calc(48px + env(safe-area-inset-bottom))}
+@media(max-width:600px){.main{padding:14px 12px calc(40px + env(safe-area-inset-bottom))}.topbar-in{padding:10px 14px 0}.t-user span{display:none}}
+
+.panel{background:var(--surface);border-radius:var(--r3);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.panel-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line-2)}
+.panel-h h2{font-size:16px;font-weight:700}
+.panel-b{padding:18px}
+.spacer{flex:1}
+.day-off{font-size:13px;color:var(--warn);background:var(--warn-bg);padding:2px 10px;border-radius:999px;font-weight:600}
+.loading{padding:48px 16px;text-align:center;color:var(--muted);display:flex;gap:10px;justify-content:center;align-items:center}
+
+/* شريط الأرقام */
+.stats{display:grid;grid-template-columns:1.5fr repeat(3,1fr);background:var(--surface);border-radius:var(--r3);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+.stat{padding:16px 18px;border-inline-start:1px solid var(--line-2)}
+.stat:first-child{border-inline-start:0}
+.stat-l{font-size:13px;color:var(--muted);font-weight:500}
+.stat-v{font-size:30px;font-weight:700;line-height:1.2;font-variant-numeric:tabular-nums;margin-top:2px}
+.stat-v small{font-size:14px;font-weight:500;color:var(--muted)}
+.stat-v.warn{color:var(--warn)}
+.stat-v.bad{color:var(--bad)}
+.meter{height:6px;border-radius:6px;background:var(--line-2);margin-top:10px;overflow:hidden;position:relative}
+.meter i{position:absolute;inset-block:0;inset-inline-start:0;background:var(--pri);border-radius:6px}
+@media(max-width:720px){
+  .stats{grid-template-columns:repeat(3,1fr)}
+  .stat.lead{grid-column:1/-1;border-bottom:1px solid var(--line-2)}
+  .stat:nth-child(2){border-inline-start:0}
+  .stat{padding:12px 14px}
+  .stat-v{font-size:24px}
+}
+
+/* جداول */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:start;font-size:12.5px;font-weight:600;color:var(--muted);padding:9px 16px;background:var(--sunk);border-bottom:1px solid var(--line-2);white-space:nowrap}
+td{padding:10px 16px;border-bottom:1px solid var(--line-2);vertical-align:middle;white-space:nowrap}
+tbody tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:#FAFCFB}
+td.num,th.num{font-variant-numeric:tabular-nums}
+.who b{display:block;font-weight:600}
+.who span{display:block;font-size:12.5px;color:var(--muted)}
+.t-in{color:var(--ok);font-weight:600}
+.t-out{color:var(--bad);font-weight:600}
+.dim{color:var(--muted)}
+.acts{text-align:end}
+td.empty{padding:44px 16px;text-align:center;color:var(--muted);white-space:normal}
+td.empty b{display:block;color:var(--ink);font-size:15px;margin-bottom:4px}
+.pct{display:flex;align-items:center;gap:10px;font-weight:700;font-variant-numeric:tabular-nums}
+.pct .meter{width:90px;margin:0}
+.pct.ok{color:var(--ok)}.pct.ok .meter i{background:var(--ok)}
+.pct.warn{color:var(--warn)}.pct.warn .meter i{background:#D39A20}
+.pct.bad{color:var(--bad)}.pct.bad .meter i{background:var(--bad)}
+
+/* وسوم الحالة */
+.tag{display:inline-flex;align-items:center;gap:5px;padding:1px 9px;border-radius:999px;font-size:12.5px;font-weight:600;line-height:1.8;margin-inline-end:4px}
+.tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}
+.tag.warn{background:var(--warn-bg);color:var(--warn)}
+.tag.bad{background:var(--bad-bg);color:var(--bad)}
+.tag.info{background:var(--info-bg);color:var(--info)}
+.tag.muted{background:var(--sunk);color:var(--muted)}
+
+/* الغائبون */
+.absent{padding:12px 16px;border-top:1px solid var(--line-2)}
+.absent summary{cursor:pointer;font-weight:600;font-size:14px;color:var(--bad);width:max-content;max-width:100%}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{padding:4px 12px;border-radius:999px;background:var(--surface);box-shadow:inset 0 0 0 1px var(--line);font-size:13px}
+.chip:hover{background:var(--pri-soft)}
+
+/* الإعدادات */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+@media(max-width:820px){.grid2{grid-template-columns:1fr}}
+.grid2 .panel{margin-bottom:0}
+.span2{grid-column:1/-1}
+.days{display:flex;flex-wrap:wrap;gap:6px}
+.day{min-height:38px;padding:0 14px;border-radius:var(--r1);box-shadow:inset 0 0 0 1px var(--line);font-weight:600;font-size:13.5px;color:var(--muted);background:var(--surface)}
+.day[aria-pressed=true]{background:var(--pri);color:#fff;box-shadow:none}
+.loc-box{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--sunk);border-radius:var(--r2);padding:12px 14px;margin-bottom:16px}
+.loc-state{font-weight:600;font-size:14px}
+.loc-state.ok{color:var(--ok)}.loc-state.bad{color:var(--bad)}
+.savebar{position:sticky;bottom:0;display:flex;justify-content:flex-end;padding:14px 0 calc(6px + env(safe-area-inset-bottom));margin-top:16px;background:linear-gradient(to top,var(--bg) 70%,transparent)}
+.savebar .btn{min-width:180px}
+@media(max-width:560px){.savebar .btn{width:100%}}
+
+/* نافذة منبثقة */
+.ov{position:fixed;inset:0;z-index:100;background:rgba(14,28,24,.5);display:grid;place-items:center;padding:16px;opacity:0;transition:opacity .15s}
+.ov.open{opacity:1}
+.modal{background:var(--surface);border-radius:var(--r3);width:100%;max-width:500px;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);display:flex;flex-direction:column;box-shadow:0 30px 70px -20px rgba(0,0,0,.45);transform:translateY(10px);transition:transform .18s}
+.ov.open .modal{transform:none}
+.modal form{display:flex;flex-direction:column;min-height:0;flex:1}
+.mh{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line-2)}
+.mh h2{font-size:17px;font-weight:700}
+.mb{padding:18px;overflow:auto;flex:1}
+.mf{display:flex;gap:10px;padding:14px 18px calc(14px + env(safe-area-inset-bottom));border-top:1px solid var(--line-2)}
+.mf .btn{flex:1}
+.cred{background:var(--pri-soft);border-radius:var(--r2);padding:12px 14px;font-size:14px;line-height:1.9;display:flex;align-items:center;gap:10px}
+.cred div{flex:1}
+.cred b{font-variant-numeric:tabular-nums;letter-spacing:.02em}
+@media(max-width:560px){.ov{place-items:end center;padding:0}.modal{border-radius:var(--r3) var(--r3) 0 0;max-height:92dvh}}
+
+/* تنبيه عائم */
+.toast{position:fixed;z-index:200;inset-inline:0;bottom:calc(20px + env(safe-area-inset-bottom));margin:auto;width:max-content;max-width:calc(100% - 32px);background:var(--ink);color:#fff;padding:11px 18px;border-radius:var(--r2);font-weight:500;font-size:14px;box-shadow:0 16px 40px -12px rgba(0,0,0,.4);transform:translateY(calc(100% + 40px));opacity:0;transition:transform .25s,opacity .25s;pointer-events:none;white-space:pre-line;text-align:center}
+.toast.show{transform:none;opacity:1}
+.toast.err{background:var(--bad)}
+
+/* شاشة الموظف: السبّورة */
+.att{min-height:100vh;min-height:100dvh;background:var(--board);padding:calc(16px + env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom))}
+.att-wrap{max-width:460px;margin:auto}
+.board{color:var(--chalk);padding:4px 4px 24px}
+.board-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.school{font-weight:700;font-size:16px;line-height:1.4}
+.who-l{font-size:14px;color:var(--chalk-dim)}
+.btn.chalk{background:rgba(255,255,255,.1);color:var(--chalk)}
+.btn.chalk:hover{background:rgba(255,255,255,.18)}
+.board-head{text-align:center;padding:36px 0 26px}
+.board-head .school{font-size:21px}
+.board-head p{color:var(--chalk-dim);font-size:14px}
+.clock{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:28px;font-variant-numeric:tabular-nums;direction:ltr}
+.clock b{font-size:clamp(66px,22vw,100px);font-weight:600;letter-spacing:-.02em;line-height:1}
+.clock span{font-size:24px;color:var(--chalk-dim);font-weight:500;width:2.2ch;text-align:left}
+.date-l{text-align:center;margin-top:10px;font-size:15px}
+.date-l span{display:block;font-size:13px;color:var(--chalk-dim)}
+.tl{margin-top:24px}
+.tl-track{position:relative;height:8px;border-radius:8px;background:rgba(255,255,255,.13)}
+.tl-fill{position:absolute;inset-block:0;inset-inline-start:0;border-radius:8px;background:rgba(243,246,239,.32)}
+.tl-mk{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;transform:translate(50%,-50%);border:2px solid var(--board)}
+.tl-mk.in{background:#83D6A9}
+.tl-mk.out{background:#F2A493}
+.tl-now{position:absolute;top:50%;width:3px;height:22px;border-radius:2px;background:var(--chalk);transform:translate(50%,-50%)}
+.tl-ends{display:flex;justify-content:space-between;font-size:12.5px;color:var(--chalk-dim);margin-top:8px;font-variant-numeric:tabular-nums}
+.sheet{background:var(--surface);border-radius:var(--r3);padding:18px;margin-bottom:12px;box-shadow:0 18px 40px -22px rgba(0,0,0,.5)}
+.status{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;margin-bottom:14px}
+.status::before{content:"";width:10px;height:10px;border-radius:50%;background:currentColor;flex:none}
+.status.s-none{color:var(--warn)}
+.status.s-in{color:var(--ok)}
+.status.s-done{color:var(--muted)}
+.status small{font-weight:500;font-size:13px;color:var(--muted);margin-inline-start:auto}
+.recap{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.recap div{background:var(--sunk);border-radius:var(--r2);padding:9px 12px}
+.recap span{display:block;font-size:12.5px;color:var(--muted)}
+.recap b{font-size:18px;font-variant-numeric:tabular-nums}
+.btn.punch-out{background:var(--bad)}
+.btn.punch-out:hover{background:#8C2D1F}
+.done-l{text-align:center;color:var(--muted);font-weight:500;padding:6px 0}
+.gps{text-align:center;font-size:12.5px;margin-top:12px;color:var(--muted)}
+.gps.off{color:var(--bad)}
+.hist h2{font-size:15px;font-weight:700;margin-bottom:6px}
+.hist ul{list-style:none}
+.hist li{display:grid;grid-template-columns:1fr auto auto auto;gap:14px;align-items:center;padding:10px 0;border-top:1px solid var(--line-2);font-size:14px}
+.hist li:first-child{border-top:0}
+.hist .d b{display:block;font-weight:600}
+.hist .d span,.hist .tm span{display:block;font-size:12px;color:var(--muted)}
+.hist .tm{font-variant-numeric:tabular-nums;text-align:center}
+.hist .tag{margin:0}
+.hist .empty{padding:24px 0;text-align:center;color:var(--muted);display:block}
+.sheet .link{display:block;margin:14px auto 0}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation-duration:1.5s!important}}
+</style>
+</head>
+<body>
+
+<div id="bootScreen" class="boot"><div><span class="spin" aria-hidden="true"></span><p id="bootMsg" style="margin-top:12px">جاري التحميل…</p></div></div>
+
+<!-- دخول الإدارة -->
+<main id="authScreen" class="auth" hidden>
+  <div class="auth-card">
+    <div class="brand">
+      <div class="brand-mk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/></svg></div>
+      <div><h1 id="authSchool">نظام الحضور والانصراف</h1><p id="authSub">دخول الإدارة</p></div>
+    </div>
+    <form id="authForm" data-submit="auth" novalidate>
+      <div class="alert" id="authErr" role="alert" hidden></div>
+      <div class="f" id="wName" hidden><label for="fName">الاسم الكامل</label><input id="fName" autocomplete="name"></div>
+      <div class="f"><label for="fEmail">البريد الإلكتروني</label><input type="email" id="fEmail" dir="ltr" autocomplete="username" inputmode="email" autocapitalize="off" spellcheck="false"></div>
+      <div class="f"><label for="fPass">كلمة المرور</label><input type="password" id="fPass" dir="ltr" autocomplete="current-password"></div>
+      <div class="f" id="wPass2" hidden><label for="fPass2">تأكيد كلمة المرور</label><input type="password" id="fPass2" dir="ltr" autocomplete="new-password"></div>
+      <button class="btn block lg" id="authBtn" type="submit">دخول</button>
+    </form>
+    <div class="auth-links"><button type="button" class="link" id="forgotLink" data-act="forgot">نسيت كلمة المرور؟</button><span id="modeLink"></span></div>
+    <div class="divider"></div>
+    <button type="button" class="btn ghost block" data-act="toEmp">دخول الموظفين لتسجيل الحضور</button>
+  </div>
+</main>
+
+<!-- شاشة الموظف -->
+<div id="attScreen" class="att" hidden><div class="att-wrap" id="attWrap"></div></div>
+
+<!-- لوحة الإدارة -->
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="topbar-in">
+      <div><div class="t-school" id="appTitle"></div><div class="t-year" id="appYear"></div></div>
+      <div class="t-user"><span id="userName"></span><button type="button" class="btn ghost sm" data-act="logout">خروج</button></div>
+    </div>
+    <nav class="nav" id="tabs" aria-label="أقسام النظام"></nav>
+  </header>
+  <main class="main" id="view"></main>
+</div>
+
+<div class="ov" id="ov" hidden><div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle"></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+"use strict";
+
+/* ========================================================
+   إعدادات Firebase — مشروع school-attendance-3a2e8
+   ======================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCZ3FGtw_oK-EF9tjdykhirDqWZbcUGGaBs",
+  authDomain: "school-attendance-3a2e8.firebaseapp.com",
+  projectId: "school-attendance-3a2e8",
+  storageBucket: "school-attendance-3a2e8.firebasestorage.app",
+  messagingSenderId: "908181466748",
+  appId: "1:908181466748:web:9b04c39786a8100b48e3f9"
+};
+
+if (typeof firebase === 'undefined') {
+  document.getElementById('bootMsg').textContent = 'تعذّر تحميل مكتبات النظام. تحقّق من اتصال الإنترنت ثم أعد تحميل الصفحة.';
+  throw new Error('Firebase SDK not loaded');
+}
+if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const FV = firebase.firestore.FieldValue;
+// تخزين محلي للبيانات: فتح أسرع وعمل أفضل مع الاتصال الضعيف
+try { db.enablePersistence({ synchronizeTabs: true }).catch(() => {}); } catch (e) {}
+
+/* ====== أدوات عامة ====== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const num = v => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const pad2 = x => String(x).padStart(2, '0');
+const userErr = m => Object.assign(new Error(m), { user: true });
+const withTimeout = (p, ms, msg) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(Object.assign(userErr(msg || 'الاتصال بالإنترنت ضعيف أو مقطوع. أعد المحاولة'), { code: 'timeout' })), ms))]);
+
+const AR_DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const AR_MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+const JOBS = ['مديرة', 'وكيلة', 'معلمة', 'مساعدة معلمة', 'إدارية', 'محاسبة', 'استقبال', 'حارس', 'عاملة نظافة', 'أخرى'];
+const TIMEZONES = [
+  ['Asia/Riyadh', 'السعودية والكويت وقطر والبحرين (UTC+3)'],
+  ['Asia/Dubai', 'الإمارات وعُمان (UTC+4)'],
+  ['Asia/Baghdad', 'العراق (UTC+3)'],
+  ['Asia/Amman', 'الأردن'],
+  ['Africa/Cairo', 'مصر']
+];
+
+const DEFAULT_CFG = {
+  name: 'مدرستي',
+  year: '١٤٤٧هـ',
+  att: { inTime: '07:00', outTime: '13:00', graceMin: 5, lat: null, lng: null, radius: 150, workDays: [0, 1, 2, 3, 4], tz: 'Asia/Riyadh' }
+};
+
+const svg = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const IC = {
+  check: svg('<path d="M20 6 9 17l-5-5"/>'),
+  x: svg('<path d="M18 6 6 18M6 6l12 12"/>'),
+  plus: svg('<path d="M12 5v14M5 12h14"/>'),
+  edit: svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>'),
+  trash: svg('<path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>'),
+  print: svg('<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/>'),
+  download: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/>'),
+  pin: svg('<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>'),
+  unlock: svg('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>'),
+  copy: svg('<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>'),
+  refresh: svg('<path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>'),
+  prev: svg('<path d="m9 18 6-6-6-6"/>'),
+  next: svg('<path d="m15 18-6-6 6-6"/>')
+};
+
+/* ====== الحالة ====== */
+const ST = { cfg: null, attUsers: [], usersLoaded: false, months: {} };
+const CUR = { user: null, tab: 'records', recDate: '', month: '', q: '' };
+const ATT = { user: null, recs: [] };
+let CLOCK_OFFSET = 0;          // فرق ساعة الخادم عن ساعة الجهاز (ms) — يمنع التلاعب بساعة الجوال
+let PENDING_SIGNUP = false;
+let unsubUsers = null, unsubMonth = null, watchedMonth = null;
+
+/* ====== الوقت (بتوقيت المدرسة وليس توقيت الجهاز) ====== */
+const attCfg = () => (ST.cfg && ST.cfg.att) || DEFAULT_CFG.att;
+const nowDate = () => new Date(Date.now() + CLOCK_OFFSET);
+const _fmtCache = new Map();
+function zoneParts(d) {
+  const zone = attCfg().tz || '';
+  let f = _fmtCache.get(zone);
+  if (f === undefined) {
+    try {
+      f = new Intl.DateTimeFormat('en-GB', { timeZone: zone || undefined, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+    } catch (e) { f = null; }
+    _fmtCache.set(zone, f);
+  }
+  if (f) {
+    const o = {};
+    for (const p of f.formatToParts(d)) o[p.type] = p.value;
+    if (o.hour === '24') o.hour = '00';
+    return { date: `${o.year}-${o.month}-${o.day}`, hm: `${o.hour}:${o.minute}`, sec: o.second };
+  }
+  return { date: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`, hm: `${pad2(d.getHours())}:${pad2(d.getMinutes())}`, sec: pad2(d.getSeconds()) };
+}
+const today = () => zoneParts(nowDate()).date;
+const nowHM = () => zoneParts(nowDate()).hm;
+function localeDate(d, locale, opts) {
+  try { return d.toLocaleDateString(locale, Object.assign({ timeZone: attCfg().tz || undefined }, opts)); }
+  catch (e) { return d.toLocaleDateString(locale, opts); }
+}
+const hm2min = t => { if (!t) return 0; const [h, m] = String(t).split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+const dayOfWeek = d => new Date(d + 'T12:00:00Z').getUTCDay();
+const addDays = (d, n) => { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+const addMonths = (ym, n) => { const [y, m] = ym.split('-').map(Number); return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7); };
+const fmtDate = d => { if (!d) return '—'; const p = d.split('-'); return p.length < 3 ? d : `${p[2]}/${p[1]}/${p[0]}`; };
+const fmtDur = m => m > 0 ? `${Math.floor(m / 60)}س ${m % 60}د` : '—';
+const monthLabel = ym => { const [y, m] = ym.split('-').map(Number); return `${AR_MONTHS[m - 1]} ${y}`; };
+function monthDays(ym) { const [y, m] = ym.split('-').map(Number); const n = new Date(y, m, 0).getDate(); return Array.from({ length: n }, (_, i) => `${ym}-${pad2(i + 1)}`); }
+
+const lateMinOf = hm => hm ? Math.max(0, hm2min(hm) - hm2min(attCfg().inTime) - num(attCfg().graceMin)) : 0;
+const earlyMinOf = hm => hm ? Math.max(0, hm2min(attCfg().outTime) - hm2min(hm)) : 0;
+const workMinOf = (a, b) => (a && b) ? Math.max(0, hm2min(b) - hm2min(a)) : 0;
+const isWorkDay = d => (attCfg().workDays || [0, 1, 2, 3, 4]).includes(dayOfWeek(d));
+const recLate = r => r.lateMin != null ? num(r.lateMin) : lateMinOf(r.inTime);
+const recEarly = r => r.outTime ? (r.earlyMin != null ? num(r.earlyMin) : earlyMinOf(r.outTime)) : 0;
+
+/* ====== واجهة عامة ====== */
+let _toastT;
+function toast(msg, isErr) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(_toastT);
+  _toastT = setTimeout(() => t.classList.remove('show'), isErr ? 4200 : 2600);
+}
+function showAlert(el, msg, ok) { if (!el) return; el.textContent = msg; el.className = 'alert' + (ok ? ' ok' : ''); el.hidden = false; }
+function busy(btn, label) {
+  if (!btn) return;
+  if (btn.dataset.html == null) btn.dataset.html = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin" aria-hidden="true"></span> ${esc(label || '')}`;
+}
+function unbusy(btn) {
+  if (!btn) return;
+  btn.disabled = false;
+  if (btn.dataset.html != null) { btn.innerHTML = btn.dataset.html; delete btn.dataset.html; }
+}
+function showScreen(id) {
+  for (const s of ['bootScreen', 'authScreen', 'attScreen', 'app']) $('#' + s).hidden = s !== id;
+  if (id !== 'attScreen') stopTicker();
+  window.scrollTo(0, 0);
+}
+function errMsg(e) {
+  const c = (e && e.code) || '';
+  const map = {
+    'auth/email-already-in-use': 'هذا البريد مسجّل مسبقاً',
+    'auth/weak-password': 'كلمة المرور ضعيفة — استخدم ٦ أحرف على الأقل',
+    'auth/invalid-email': 'صيغة البريد الإلكتروني غير صحيحة',
+    'auth/wrong-password': 'البريد أو كلمة المرور غير صحيحة',
+    'auth/user-not-found': 'البريد أو كلمة المرور غير صحيحة',
+    'auth/invalid-credential': 'البريد أو كلمة المرور غير صحيحة',
+    'auth/invalid-login-credentials': 'البريد أو كلمة المرور غير صحيحة',
+    'auth/too-many-requests': 'محاولات كثيرة. انتظر قليلاً ثم أعد المحاولة',
+    'auth/network-request-failed': 'لا يوجد اتصال بالإنترنت',
+    'auth/api-key-not-valid': 'مفتاح API غير صالح — راجع إعدادات Firebase',
+    'auth/invalid-api-key': 'مفتاح API غير صالح — راجع إعدادات Firebase',
+    'permission-denied': 'لا توجد صلاحية لهذه العملية — راجع قواعد Firestore',
+    'unavailable': 'لا يوجد اتصال بالخادم. تحقّق من الإنترنت ثم أعد المحاولة',
+    'deadline-exceeded': 'انتهت مهلة الاتصال بالخادم. أعد المحاولة'
+  };
+  if (map[c]) return map[c];
+  if (c.startsWith('auth/api-key')) return map['auth/api-key-not-valid'];
+  return (e && e.message) || 'حدث خطأ غير متوقع';
+}
+
+/* ====== كلمات مرور الموظفين ====== */
+function djb2(s) { let h = 5381; for (let i = 0; i < s.length; i++) { h = ((h << 5) + h) + s.charCodeAt(i); h = h & 0xffffffff; } return h >>> 0; }
+const legacyHash = s => String(djb2(s));
+const toHex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+async function sha256(str) {
+  if (!(window.crypto && crypto.subtle)) throw userErr('المتصفح لا يدعم التشفير الآمن. افتح النظام عبر رابط https');
+  return toHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)));
+}
+async function makePw(pass) {
+  const salt = toHex(crypto.getRandomValues(new Uint8Array(12)));
+  return { pwSalt: salt, pwHash: await sha256(salt + ':' + pass), pwVer: 2 };
+}
+async function checkPw(emp, pass) {
+  if (emp.pwVer === 2 && emp.pwSalt) return (await sha256(emp.pwSalt + ':' + pass)) === emp.pwHash;
+  return !!emp.pwHash && emp.pwHash === legacyHash(pass);
+}
+function genPassword() {
+  const A = 'abcdefghjkmnpqrstuvwxyz23456789';
+  return [...crypto.getRandomValues(new Uint32Array(6))].map(x => A[x % A.length]).join('');
+}
+const TR = { 'ا': 'a', 'أ': 'a', 'إ': 'e', 'آ': 'a', 'ب': 'b', 'ت': 't', 'ث': 'th', 'ج': 'j', 'ح': 'h', 'خ': 'kh', 'د': 'd', 'ذ': 'th', 'ر': 'r', 'ز': 'z', 'س': 's', 'ش': 'sh', 'ص': 's', 'ض': 'd', 'ط': 't', 'ظ': 'z', 'ع': 'a', 'غ': 'gh', 'ف': 'f', 'ق': 'q', 'ك': 'k', 'ل': 'l', 'م': 'm', 'ن': 'n', 'ه': 'h', 'ة': 'a', 'و': 'w', 'ي': 'y', 'ى': 'a', 'ئ': 'e', 'ؤ': 'o', 'ء': '' };
+function genUsername(name) {
+  const first = (name || '').trim().split(/\s+/)[0] || '';
+  let base = [...first].map(ch => TR[ch] ?? (/[a-z0-9]/i.test(ch) ? ch.toLowerCase() : '')).join('').slice(0, 10);
+  if (base.length < 2) base = 'user';
+  const taken = new Set(ST.attUsers.map(u => (u.username || '').toLowerCase()));
+  let un;
+  do { un = base + (100 + Math.floor(Math.random() * 900)); } while (taken.has(un));
+  return un;
+}
+
+/* ====== الجهاز وجلسة الموظف ====== */
+function deviceId() {
+  let id = null;
+  try { id = localStorage.getItem('kg:deviceId'); } catch (e) {}
+  if (id) return id;
+  const raw = [navigator.userAgent, screen.width + 'x' + screen.height, new Date().getTimezoneOffset()].join('|');
+  id = 'fp-' + djb2(raw).toString(36);
+  try { localStorage.setItem('kg:deviceId', id); } catch (e) {}
+  return id;
+}
+const SESS_KEY = 'kg:attSession';
+function saveSess(emp) { try { localStorage.setItem(SESS_KEY, JSON.stringify({ id: emp.id, k: String(emp.pwHash || '').slice(0, 12) })); } catch (e) {} }
+function readSess() { try { return JSON.parse(localStorage.getItem(SESS_KEY) || 'null'); } catch (e) { return null; } }
+function clearSess() { try { localStorage.removeItem(SESS_KEY); } catch (e) {} }
+
+/* ====== الإعدادات ====== */
+function normCfg(d) {
+  const c = Object.assign(clone(DEFAULT_CFG), d || {});
+  c.att = Object.assign({}, DEFAULT_CFG.att, (d && d.att) || {});
+  return c;
+}
+async function loadCfg() {
+  try {
+    const s = await db.collection('meta').doc('config').get();
+    ST.cfg = normCfg(s.exists ? s.data() : null);
+  } catch (e) { ST.cfg = normCfg(null); }
+  document.title = (ST.cfg.name || 'مدرستي') + ' — الحضور والانصراف';
+}
+
+/* ==================== دخول الإدارة ==================== */
+let AUTH_MODE = 'login';
+function setAuthMode(m) {
+  AUTH_MODE = m;
+  $('#authErr').hidden = true;
+  const signup = m === 'signup';
+  $('#authSchool').textContent = (ST.cfg && ST.cfg.name) || 'نظام الحضور والانصراف';
+  $('#authSub').textContent = signup ? 'إنشاء حساب المالك (أول استخدام فقط)' : 'دخول الإدارة';
+  $('#wName').hidden = !signup;
+  $('#wPass2').hidden = !signup;
+  $('#fPass').autocomplete = signup ? 'new-password' : 'current-password';
+  $('#authBtn').textContent = signup ? 'إنشاء الحساب والدخول' : 'دخول';
+  $('#forgotLink').hidden = signup;
+  $('#modeLink').innerHTML = signup ? '<button type="button" class="link" data-act="authMode" data-id="login">لديّ حساب</button>' : '';
+}
+
+async function showAuth() {
+  showScreen('authScreen');
+  unbusy($('#authBtn'));
+  setAuthMode('login');
+  try {
+    const s = await db.collection('users').limit(1).get();
+    if (s.empty && !$('#authScreen').hidden) setAuthMode('signup');
+  } catch (e) { /* عند تعذّر المعرفة نُبقي شاشة الدخول */ }
+}
+
+async function doAuth() {
+  const err = $('#authErr'); err.hidden = true;
+  const email = ($('#fEmail').value || '').trim().toLowerCase();
+  const pass = $('#fPass').value || '';
+  const btn = $('#authBtn');
+  try {
+    if (AUTH_MODE === 'signup') {
+      const nm = ($('#fName').value || '').trim();
+      if (!nm) throw userErr('أدخل اسمك الكامل');
+      if (!email) throw userErr('أدخل البريد الإلكتروني');
+      if (pass.length < 6) throw userErr('كلمة المرور ٦ أحرف على الأقل');
+      if (pass !== $('#fPass2').value) throw userErr('كلمتا المرور غير متطابقتين');
+      busy(btn, 'جاري إنشاء الحساب…');
+      PENDING_SIGNUP = true;
+      const cred = await auth.createUserWithEmailAndPassword(email, pass);
+      await db.collection('users').doc(cred.user.uid).set({ name: nm, email, role: 'owner', createdAt: new Date().toISOString() });
+      const c = await db.collection('meta').doc('config').get();
+      if (!c.exists) await db.collection('meta').doc('config').set(clone(DEFAULT_CFG));
+      await loadCfg();
+      PENDING_SIGNUP = false;
+      CUR.tab = 'settings';
+      await enterAdmin(cred.user, nm);
+      toast('تم إنشاء الحساب. ابدأ بضبط الإعدادات وموقع المدرسة');
+    } else {
+      if (!email || !pass) throw userErr('أدخل البريد الإلكتروني وكلمة المرور');
+      busy(btn, 'جاري الدخول…');
+      await auth.signInWithEmailAndPassword(email, pass);
+      // يكمل onAuthStateChanged الدخول (بدون تحميل مكرّر)
+    }
+  } catch (e) {
+    const wasSignup = PENDING_SIGNUP;
+    PENDING_SIGNUP = false;
+    unbusy(btn);
+    showAlert(err, e.user ? e.message : errMsg(e));
+    if (wasSignup && auth.currentUser) enterAdmin(auth.currentUser).catch(() => {});
+  }
+}
+
+async function forgotPw() {
+  const email = ($('#fEmail').value || '').trim();
+  if (!email) return showAlert($('#authErr'), 'اكتب بريدك الإلكتروني أولاً ثم اضغط «نسيت كلمة المرور؟»');
+  try {
+    await auth.sendPasswordResetEmail(email);
+    showAlert($('#authErr'), 'أرسلنا رابط إعادة تعيين كلمة المرور إلى بريدك', true);
+  } catch (e) { showAlert($('#authErr'), errMsg(e)); }
+}
+
+async function enterAdmin(fbUser, signupName) {
+  CUR.user = { uid: fbUser.uid, email: fbUser.email, name: signupName || fbUser.displayName || fbUser.email };
+  try {
+    const d = await db.collection('users').doc(fbUser.uid).get();
+    if (d.exists) { if (d.data().name) CUR.user.name = d.data().name; }
+    else await db.collection('users').doc(fbUser.uid).set({ name: CUR.user.name, email: fbUser.email, role: 'owner', createdAt: new Date().toISOString() }).catch(() => {});
+  } catch (e) {}
+  $('#fPass').value = ''; $('#fPass2').value = '';
+  updateHeader();
+  showScreen('app');
+  if (!unsubUsers) {
+    unsubUsers = db.collection('attUsers').onSnapshot(snap => {
+      ST.attUsers = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.name || '').localeCompare(b.name || '', 'ar'));
+      ST.usersLoaded = true;
+      if (CUR.tab !== 'settings') softRender();
+      migratePlain();
+    }, e => { ST.usersLoaded = true; toast(errMsg(e), true); softRender(); });
+  }
+  renderTabs();
+  renderView();
+}
+function updateHeader() {
+  $('#appTitle').textContent = ST.cfg.name || 'مدرستي';
+  $('#appYear').textContent = ST.cfg.year ? 'العام الدراسي ' + ST.cfg.year : '';
+  $('#userName').textContent = CUR.user ? CUR.user.name : '';
+  document.title = (ST.cfg.name || 'مدرستي') + ' — الحضور والانصراف';
+}
+function stopAdmin() {
+  if (unsubUsers) unsubUsers();
+  if (unsubMonth) unsubMonth();
+  unsubUsers = unsubMonth = watchedMonth = null;
+  ST.attUsers = []; ST.usersLoaded = false; ST.months = {};
+  CUR.user = null;
+}
+async function doLogout() {
+  stopAdmin();
+  CUR.tab = 'records'; CUR.recDate = ''; CUR.month = ''; CUR.q = '';
+  await auth.signOut().catch(() => {});
+  toast('تم تسجيل الخروج');
+}
+
+// إزالة كلمات المرور المخزّنة كنص مكشوف من الإصدار السابق وتحويلها إلى تشفير SHA-256
+let _migrated = false;
+async function migratePlain() {
+  if (_migrated) return;
+  _migrated = true;
+  const list = ST.attUsers.filter(u => u.pwPlain && u.pwVer !== 2 && legacyHash(u.pwPlain) === u.pwHash);
+  const stale = ST.attUsers.filter(u => u.pwPlain && !list.includes(u));
+  let n = 0;
+  for (const u of list) {
+    try { await db.collection('attUsers').doc(u.id).update(Object.assign(await makePw(u.pwPlain), { pwPlain: FV.delete() })); n++; }
+    catch (e) { console.warn('migrate', e); }
+  }
+  for (const u of stale) { try { await db.collection('attUsers').doc(u.id).update({ pwPlain: FV.delete() }); } catch (e) {} }
+  if (n) toast(`تم تأمين كلمات مرور ${n} موظف`);
+}
+
+/* ==================== التبويبات ==================== */
+const TABS = [['records', 'السجل اليومي'], ['stats', 'الإحصائيات'], ['monthly', 'التقرير الشهري'], ['accounts', 'الموظفون'], ['settings', 'الإعدادات']];
+function renderTabs() {
+  $('#tabs').innerHTML = TABS.map(([k, l]) => `<button type="button" data-act="tab" data-id="${k}" ${CUR.tab === k ? 'aria-current="page"' : ''}>${l}</button>`).join('');
+}
+function switchTab(t) { CUR.tab = t; renderTabs(); renderView(); window.scrollTo(0, 0); }
+function renderView() {
+  const map = { records: vRecords, stats: vStats, monthly: vMonthly, accounts: vAccounts, settings: vSettings };
+  $('#view').innerHTML = (map[CUR.tab] || vRecords)();
+  if (CUR.tab === 'accounts') applySearch();
+}
+// إعادة رسم لا تقطع المستخدم أثناء الكتابة في حقل
+let _pendingRender = false;
+function softRender() {
+  if ($('#app').hidden) return;
+  const a = document.activeElement;
+  if (a && $('#view').contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) { _pendingRender = true; return; }
+  renderView();
+}
+
+/* ==================== تحميل السجلات حسب الشهر (مباشر) ==================== */
+function watchMonth(ym) {
+  if (watchedMonth === ym) return;
+  if (unsubMonth) unsubMonth();
+  watchedMonth = ym;
+  if (!ST.months[ym]) ST.months[ym] = { loaded: false, recs: [] };
+  const days = monthDays(ym);
+  unsubMonth = db.collection('attendance').where('date', '>=', days[0]).where('date', '<=', days[days.length - 1])
+    .onSnapshot(snap => {
+      ST.months[ym] = { loaded: true, recs: snap.docs.map(d => ({ id: d.id, ...d.data() })) };
+      if (watchedMonth === ym && ['records', 'stats', 'monthly'].includes(CUR.tab)) softRender();
+    }, e => {
+      ST.months[ym] = { loaded: true, recs: [], error: errMsg(e) };
+      if (watchedMonth === ym) { unsubMonth = null; softRender(); }
+    });
+}
+const recsOf = ym => (ST.months[ym] && ST.months[ym].recs) || [];
+const activeUsers = () => ST.attUsers.filter(u => u.active !== false);
+function findRec(id) { for (const k in ST.months) { const r = ST.months[k].recs.find(x => x.id === id); if (r) return r; } return null; }
+function loadingOr(ym) {
+  const M = ST.months[ym];
+  if (M && M.error) return `<div class="loading" style="color:var(--bad)">${esc(M.error)} <button type="button" class="btn ghost sm" data-act="retryMonth">إعادة المحاولة</button></div>`;
+  if (!M || !M.loaded || !ST.usersLoaded) return '<div class="loading"><span class="spin"></span> جاري تحميل السجلات…</div>';
+  return '';
+}
+const tag = (c, t) => `<span class="tag ${c}">${esc(t)}</span>`;
+
+/* ==================== سجل اليوم ==================== */
+function vRecords() {
+  const t = today();
+  const d = CUR.recDate || t;
+  const ym = d.slice(0, 7);
+  watchMonth(ym);
+  const wait = loadingOr(ym);
+  const workday = isWorkDay(d);
+
+  const toolbar = `
+    <div class="panel-h">
+      <button type="button" class="icon-btn" data-act="dayShift" data-id="-1" aria-label="اليوم السابق">${IC.prev}</button>
+      <input type="date" class="in" value="${d}" max="${t}" data-change="recDate" aria-label="التاريخ">
+      <button type="button" class="icon-btn" data-act="dayShift" data-id="1" aria-label="اليوم التالي" ${d >= t ? 'disabled' : ''}>${IC.next}</button>
+      ${d !== t ? '<button type="button" class="btn ghost sm" data-act="recToday">اليوم</button>' : ''}
+      <strong style="font-size:15px">${AR_DAYS[dayOfWeek(d)]}</strong>
+      ${!workday ? '<span class="day-off">ليس يوم دوام</span>' : ''}
+      <span class="spacer"></span>
+      <button type="button" class="btn sm" data-act="manual">${IC.plus} تسجيل يدوي</button>
+    </div>`;
+
+  if (wait) return `<section class="panel">${toolbar}${wait}</section>`;
+
+  const users = activeUsers();
+  const recs = recsOf(ym).filter(r => r.date === d).sort((a, b) => (a.inTime || '').localeCompare(b.inTime || ''));
+  const presentIds = new Set(recs.map(r => r.userId));
+  const presentActive = users.filter(u => presentIds.has(u.id)).length;
+  const late = recs.filter(r => recLate(r) > 0).length;
+  const early = recs.filter(r => recEarly(r) > 0).length;
+  const absentUsers = workday && d <= t ? users.filter(u => !presentIds.has(u.id) && (!u.joinDate || u.joinDate <= d)) : [];
+  const rate = users.length ? Math.round(presentActive / users.length * 100) : 0;
+  const uMap = new Map(ST.attUsers.map(u => [u.id, u]));
+  const beforeEnd = d === t && hm2min(nowHM()) < hm2min(attCfg().outTime);
+
+  const rows = recs.length ? recs.map(r => {
+    const u = uMap.get(r.userId);
+    const lm = recLate(r), em = recEarly(r);
+    const tags = [];
+    if (!r.outTime) tags.push(beforeEnd ? tag('info', 'في الدوام') : tag('muted', 'بدون انصراف'));
+    if (lm) tags.push(tag('warn', `تأخر ${lm}د`));
+    if (em) tags.push(tag('warn', `مبكر ${em}د`));
+    if (r.outTime && !lm && !em) tags.push(tag('ok', 'منضبط'));
+    if (r.addedByAdmin) tags.push(tag('muted', 'يدوي'));
+    return `<tr>
+      <td><div class="who"><b>${esc(r.userName || (u && u.name) || '—')}</b><span>${esc((u && u.job) || '')}</span></div></td>
+      <td class="num t-in">${esc(r.inTime || '—')}</td>
+      <td class="num ${r.outTime ? 't-out' : 'dim'}">${esc(r.outTime || '—')}</td>
+      <td class="num">${r.outTime ? fmtDur(workMinOf(r.inTime, r.outTime)) : '—'}</td>
+      <td>${tags.join('')}</td>
+      <td class="acts"><button type="button" class="icon-btn" data-act="editRec" data-id="${esc(r.id)}" aria-label="تعديل السجل">${IC.edit}</button><button type="button" class="icon-btn danger" data-act="delRec" data-id="${esc(r.id)}" aria-label="حذف السجل">${IC.trash}</button></td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="6" class="empty"><b>لا توجد سجلات في هذا اليوم</b>${users.length ? 'ستظهر هنا فور تسجيل الموظفين حضورهم' : 'ابدأ بإضافة الموظفين من تبويب «الموظفون»'}</td></tr>`;
+
+  return `
+    <div class="stats">
+      <div class="stat lead"><div class="stat-l">الحاضرون</div><div class="stat-v">${presentActive}<small> من ${users.length}</small></div><div class="meter"><i style="width:${rate}%"></i></div></div>
+      <div class="stat"><div class="stat-l">المتأخرون</div><div class="stat-v ${late ? 'warn' : ''}">${late}</div></div>
+      <div class="stat"><div class="stat-l">انصراف مبكر</div><div class="stat-v ${early ? 'warn' : ''}">${early}</div></div>
+      <div class="stat"><div class="stat-l">الغائبون</div><div class="stat-v ${absentUsers.length ? 'bad' : ''}">${workday && d <= t ? absentUsers.length : '—'}</div></div>
+    </div>
+    <section class="panel">
+      ${toolbar}
+      <div class="tw"><table>
+        <thead><tr><th>الموظف</th><th>الحضور</th><th>الانصراف</th><th>المدة</th><th>الحالة</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      ${absentUsers.length ? `<details class="absent"><summary>لم يسجّلوا حضوراً (${absentUsers.length})</summary>
+        <div class="chips">${absentUsers.map(u => `<button type="button" class="chip" data-act="manual" data-id="${esc(u.id)}" title="تسجيل حضور يدوي">${esc(u.name)}</button>`).join('')}</div>
+      </details>` : ''}
+    </section>`;
+}
+
+function recModal(recId, presetUser) {
+  const r = recId ? findRec(recId) : null;
+  if (recId && !r) return toast('السجل غير موجود', true);
+  const users = activeUsers();
+  if (!r && !users.length) return toast('أضف موظفين أولاً', true);
+  const c = attCfg();
+  const d = r ? r.date : (CUR.recDate || today());
+  const userField = r
+    ? `<input value="${esc(r.userName || (ST.attUsers.find(u => u.id === r.userId) || {}).name || '')}" disabled>`
+    : `<select id="mUser">${users.map(u => `<option value="${esc(u.id)}" ${u.id === presetUser ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select>`;
+  openM(r ? 'تعديل سجل' : 'تسجيل حضور يدوي', `
+    <div class="f"><label for="mUser">الموظف</label>${userField}</div>
+    <div class="f"><label for="mDate">التاريخ</label><input type="date" id="mDate" value="${d}" max="${today()}" ${r ? 'disabled' : ''}></div>
+    <div class="row2">
+      <div class="f"><label for="mIn">وقت الحضور</label><input type="time" id="mIn" value="${esc(r ? r.inTime : c.inTime)}" required></div>
+      <div class="f"><label for="mOut">وقت الانصراف</label><input type="time" id="mOut" value="${esc(r ? (r.outTime || '') : '')}"><div class="hint">اتركه فارغاً إن لم ينصرف بعد</div></div>
+    </div>
+    <div class="f"><label for="mNote">ملاحظة</label><input id="mNote" value="${esc(r ? (r.adminNote || '') : '')}" placeholder="مثال: نسيت الجوال"></div>
+  `, [
+    { label: 'إلغاء', cls: 'ghost', fn: closeM },
+    { label: r ? 'حفظ التعديل' : 'تسجيل', primary: true, fn: () => saveRec(recId) }
+  ]);
+}
+
+async function saveRec(recId) {
+  const btn = $('#mForm [type=submit]');
+  const inTime = $('#mIn').value, outTime = $('#mOut').value, note = $('#mNote').value.trim();
+  if (!inTime) return toast('أدخل وقت الحضور', true);
+  if (outTime && hm2min(outTime) <= hm2min(inTime)) return toast('وقت الانصراف يجب أن يكون بعد وقت الحضور', true);
+  const calc = { inTime, outTime: outTime || '', lateMin: lateMinOf(inTime), earlyMin: earlyMinOf(outTime), workMin: workMinOf(inTime, outTime), adminNote: note };
+  busy(btn, 'جاري الحفظ…');
+  try {
+    if (recId) {
+      await db.collection('attendance').doc(recId).update(Object.assign(calc, { editedByAdmin: true, editedAt: new Date().toISOString() }));
+      toast('تم حفظ التعديل');
+    } else {
+      const userId = $('#mUser').value, date = $('#mDate').value;
+      if (!userId || !date) { unbusy(btn); return toast('اختر الموظف والتاريخ', true); }
+      const ex = await db.collection('attendance').where('userId', '==', userId).where('date', '==', date).limit(1).get();
+      if (!ex.empty) { unbusy(btn); return toast('يوجد سجل لهذا الموظف في هذا اليوم. عدّله بدلاً من إضافة سجل جديد', true); }
+      const u = ST.attUsers.find(x => x.id === userId);
+      await db.collection('attendance').doc(userId + '_' + date).set(Object.assign(calc, { userId, userName: (u && u.name) || '', date, addedByAdmin: true, ts: Date.now() }));
+      toast('تم التسجيل');
+    }
+    closeM();
+  } catch (e) { unbusy(btn); toast(errMsg(e), true); }
+}
+
+async function delRec(id) {
+  const r = findRec(id);
+  if (!await confirmM('حذف السجل', `سيُحذف سجل ${r ? r.userName || '' : ''} بتاريخ ${fmtDate(r && r.date)} نهائياً.`, 'حذف السجل')) return;
+  try { await db.collection('attendance').doc(id).delete(); toast('تم حذف السجل'); }
+  catch (e) { toast(errMsg(e), true); }
+}
+
+/* ==================== ملخص الشهر ==================== */
+function monthSummary(ym) {
+  const t = today(), days = monthDays(ym), by = new Map();
+  for (const r of recsOf(ym)) { if (!by.has(r.userId)) by.set(r.userId, []); by.get(r.userId).push(r); }
+  return activeUsers().map(u => {
+    const rs = by.get(u.id) || [];
+    const dates = new Set(rs.map(r => r.date));
+    const join = u.joinDate || (rs.length ? rs.reduce((m, r) => r.date < m ? r.date : m, rs[0].date) : null);
+    const past = join ? days.filter(d => d < t && d >= join && isWorkDay(d)) : [];
+    const absent = past.filter(d => !dates.has(d)).length;
+    const base = past.length + (dates.has(t) ? 1 : 0);
+    const attended = past.length - absent + (dates.has(t) ? 1 : 0);
+    const lateRs = rs.filter(r => recLate(r) > 0), earlyRs = rs.filter(r => recEarly(r) > 0), done = rs.filter(r => r.outTime);
+    const totalWork = done.reduce((a, r) => a + workMinOf(r.inTime, r.outTime), 0);
+    return {
+      u, present: dates.size, absent, pct: base ? Math.round(attended / base * 100) : null,
+      lateDays: lateRs.length, totalLate: lateRs.reduce((a, r) => a + recLate(r), 0),
+      earlyDays: earlyRs.length, totalEarly: earlyRs.reduce((a, r) => a + recEarly(r), 0),
+      totalWork, avgWork: done.length ? Math.round(totalWork / done.length) : 0
+    };
+  });
+}
+function monthToolbar(ym, extra) {
+  const cur = today().slice(0, 7);
+  return `<div class="panel-h">
+    <button type="button" class="icon-btn" data-act="monShift" data-id="-1" aria-label="الشهر السابق">${IC.prev}</button>
+    <input type="month" class="in" value="${ym}" max="${cur}" data-change="month" aria-label="الشهر">
+    <button type="button" class="icon-btn" data-act="monShift" data-id="1" aria-label="الشهر التالي" ${ym >= cur ? 'disabled' : ''}>${IC.next}</button>
+    ${ym !== cur ? '<button type="button" class="btn ghost sm" data-act="monCur">الشهر الحالي</button>' : ''}
+    <strong style="font-size:15px">${monthLabel(ym)}</strong>
+    <span class="spacer"></span>${extra || ''}
+  </div>`;
+}
+
+/* ==================== الإحصائيات ==================== */
+function vStats() {
+  const ym = CUR.month || today().slice(0, 7);
+  watchMonth(ym);
+  const wait = loadingOr(ym);
+  if (wait) return `<section class="panel">${monthToolbar(ym)}${wait}</section>`;
+  const list = monthSummary(ym).sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1) || b.present - a.present);
+  const rows = list.length ? list.map((s, i) => {
+    const cls = s.pct == null ? '' : s.pct >= 90 ? 'ok' : s.pct >= 70 ? 'warn' : 'bad';
+    return `<tr>
+      <td class="num dim">${i + 1}</td>
+      <td><div class="who"><b>${esc(s.u.name)}</b><span>${esc(s.u.job || '')}</span></div></td>
+      <td class="num">${s.present}</td>
+      <td class="num" style="${s.absent ? 'color:var(--bad);font-weight:600' : ''}">${s.absent || '—'}</td>
+      <td class="num">${s.lateDays ? `${s.lateDays} <span class="dim">(${s.totalLate}د)</span>` : '—'}</td>
+      <td class="num">${s.earlyDays || '—'}</td>
+      <td>${s.pct == null ? '<span class="dim">—</span>' : `<div class="pct ${cls}"><div class="meter"><i style="width:${s.pct}%"></i></div>${s.pct}%</div>`}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty"><b>لا يوجد موظفون نشطون</b></td></tr>';
+  return `<section class="panel">${monthToolbar(ym)}
+    <div class="tw"><table>
+      <thead><tr><th>#</th><th>الموظف</th><th>أيام الحضور</th><th>الغياب</th><th>التأخر</th><th>انصراف مبكر</th><th>نسبة الالتزام</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div></section>
+    <p class="note">تُحتسب نسبة الالتزام على أيام الدوام الرسمية منذ تاريخ التحاق الموظف حتى اليوم.</p>`;
+}
+
+/* ==================== التقرير الشهري ==================== */
+function vMonthly() {
+  const ym = CUR.month || today().slice(0, 7);
+  watchMonth(ym);
+  const wait = loadingOr(ym);
+  const actions = `<button type="button" class="btn ghost sm" data-act="print" ${wait ? 'disabled' : ''}>${IC.print} طباعة / PDF</button>
+    <button type="button" class="btn sm" data-act="excel" ${wait ? 'disabled' : ''}>${IC.download} تنزيل Excel</button>`;
+  if (wait) return `<section class="panel">${monthToolbar(ym, actions)}${wait}</section>`;
+  const list = monthSummary(ym);
+  const rows = list.length ? list.map(s => `<tr>
+      <td><div class="who"><b>${esc(s.u.name)}</b><span>${esc(s.u.job || '')}</span></div></td>
+      <td class="num" style="color:var(--ok);font-weight:600">${s.present}</td>
+      <td class="num">${s.absent || '—'}</td>
+      <td class="num">${s.lateDays ? `${s.lateDays} <span class="dim">(${s.totalLate}د)</span>` : '—'}</td>
+      <td class="num">${s.earlyDays ? `${s.earlyDays} <span class="dim">(${s.totalEarly}د)</span>` : '—'}</td>
+      <td class="num">${fmtDur(s.totalWork)}</td>
+      <td class="num">${fmtDur(s.avgWork)}</td>
+    </tr>`).join('') : '<tr><td colspan="7" class="empty"><b>لا يوجد موظفون نشطون</b></td></tr>';
+  return `<section class="panel">${monthToolbar(ym, actions)}
+    <div class="tw"><table>
+      <thead><tr><th>الموظف</th><th>الحضور</th><th>الغياب</th><th>التأخر</th><th>انصراف مبكر</th><th>إجمالي الدوام</th><th>متوسط اليوم</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div></section>`;
+}
+
+function printMonthly() {
+  const ym = CUR.month || today().slice(0, 7);
+  if (loadingOr(ym)) return toast('انتظر اكتمال تحميل البيانات', true);
+  const rows = monthSummary(ym).map(s => `<tr><td>${esc(s.u.name)}</td><td>${esc(s.u.job || '—')}</td><td>${s.present}</td><td>${s.absent}</td><td>${s.lateDays ? `${s.lateDays} (${s.totalLate} د)` : '—'}</td><td>${s.earlyDays ? `${s.earlyDays} (${s.totalEarly} د)` : '—'}</td><td>${fmtDur(s.avgWork)}</td></tr>`).join('')
+    || '<tr><td colspan="7" style="text-align:center">لا بيانات</td></tr>';
+  const html = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8"><title>تقرير الحضور — ${esc(monthLabel(ym))}</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:14mm}
+body{font-family:'IBM Plex Sans Arabic',Tahoma,sans-serif;color:#14241F;margin:0;padding:24px;font-size:13px}
+header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1C5A4A;padding-bottom:10px}
+h1{font-size:20px;margin:0}.m{color:#63746D;font-size:12.5px;line-height:1.7}
+table{width:100%;border-collapse:collapse;margin-top:16px}
+th{background:#E1EEE8;color:#154738;text-align:right;padding:8px 10px;font-weight:600}
+td{padding:8px 10px;border-bottom:1px solid #D7E0DB}
+tr{break-inside:avoid}
+.sig{display:flex;justify-content:space-between;margin-top:56px}
+.np{margin-bottom:16px;padding:10px 20px;border:0;border-radius:10px;background:#1C5A4A;color:#fff;font:inherit;font-weight:600;cursor:pointer}
+@media print{.np{display:none}body{padding:0}}
+</style></head><body>
+<button class="np" onclick="print()">طباعة / حفظ PDF</button>
+<header><div><h1>${esc(ST.cfg.name)}</h1><div class="m">تقرير الحضور الشهري — ${esc(monthLabel(ym))}</div></div>
+<div class="m" style="text-align:left">${esc(ST.cfg.year || '')}<br>تاريخ الإصدار ${fmtDate(today())}</div></header>
+<table><thead><tr><th>الموظف</th><th>الوظيفة</th><th>الحضور</th><th>الغياب</th><th>التأخر</th><th>انصراف مبكر</th><th>متوسط الدوام</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="sig"><div>توقيع المسؤول: ....................</div><div>الختم</div></div>
+</body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) return toast('اسمح بالنوافذ المنبثقة لطباعة التقرير', true);
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+// مكتبة Excel تُحمَّل عند الحاجة فقط (حوالي 900KB) بدلاً من تحميلها مع كل فتح للصفحة
+let _xlsxP = null;
+function loadXLSX() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  return _xlsxP || (_xlsxP = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = () => res(window.XLSX);
+    s.onerror = () => { _xlsxP = null; rej(userErr('تعذّر تحميل مكتبة Excel. تحقّق من الاتصال')); };
+    document.head.appendChild(s);
+  }));
+}
+async function exportMonthly(btn) {
+  const ym = CUR.month || today().slice(0, 7);
+  if (loadingOr(ym)) return toast('انتظر اكتمال تحميل البيانات', true);
+  busy(btn, 'جاري التجهيز…');
+  try {
+    const X = await loadXLSX();
+    const sum = monthSummary(ym).map(s => ({
+      'الموظف': s.u.name, 'الوظيفة': s.u.job || '', 'أيام الحضور': s.present, 'أيام الغياب': s.absent,
+      'أيام التأخر': s.lateDays, 'دقائق التأخر': s.totalLate, 'أيام الانصراف المبكر': s.earlyDays,
+      'دقائق الانصراف المبكر': s.totalEarly, 'إجمالي الدوام (ساعة)': +(s.totalWork / 60).toFixed(1), 'نسبة الالتزام %': s.pct ?? ''
+    }));
+    const uMap = new Map(ST.attUsers.map(u => [u.id, u]));
+    const det = recsOf(ym).slice().sort((a, b) => a.date.localeCompare(b.date) || (a.inTime || '').localeCompare(b.inTime || '')).map(r => ({
+      'التاريخ': r.date, 'اليوم': AR_DAYS[dayOfWeek(r.date)], 'الموظف': r.userName || (uMap.get(r.userId) || {}).name || '',
+      'الحضور': r.inTime || '', 'الانصراف': r.outTime || '', 'التأخر (د)': recLate(r), 'الانصراف المبكر (د)': recEarly(r),
+      'مدة الدوام (د)': workMinOf(r.inTime, r.outTime), 'يدوي': r.addedByAdmin ? 'نعم' : '', 'ملاحظة': r.adminNote || ''
+    }));
+    const sheet = rows => { const ws = X.utils.json_to_sheet(rows.length ? rows : [{ 'ملاحظة': 'لا بيانات' }]); ws['!cols'] = Object.keys(rows[0] || { a: 1 }).map(() => ({ wch: 18 })); return ws; };
+    const wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, sheet(sum), 'الملخص');
+    X.utils.book_append_sheet(wb, sheet(det), 'التفاصيل');
+    wb.Workbook = { Views: [{ RTL: true }] };
+    X.writeFile(wb, `تقرير-الحضور-${ym}.xlsx`);
+    toast('تم تنزيل ملف Excel');
+  } catch (e) { toast(e.user ? e.message : errMsg(e), true); }
+  finally { unbusy(btn); }
+}
+
+/* ==================== الموظفون ==================== */
+function vAccounts() {
+  if (!ST.usersLoaded) return '<section class="panel"><div class="loading"><span class="spin"></span> جاري التحميل…</div></section>';
+  const list = ST.attUsers;
+  const rows = list.length ? list.map(u => {
+    const ls = u.lastSeen && u.lastSeen.toDate ? zoneParts(u.lastSeen.toDate()) : null;
+    const q = [u.name, u.username, u.job].join(' ').toLowerCase();
+    return `<tr data-q="${esc(q)}">
+      <td><div class="who"><b>${esc(u.name)}</b><span>${esc(u.job || '')}</span></div></td>
+      <td dir="ltr" style="text-align:right" class="num">${esc(u.username || '—')}</td>
+      <td>${u.active === false ? tag('bad', 'موقوف') : tag('ok', 'نشط')}</td>
+      <td>${u.deviceId ? tag('info', 'مرتبط بجهاز') : tag('muted', 'غير مرتبط')}</td>
+      <td class="num dim">${ls ? `${fmtDate(ls.date)} ${ls.hm}` : '—'}</td>
+      <td class="acts">
+        ${u.deviceId ? `<button type="button" class="icon-btn" data-act="unbind" data-id="${esc(u.id)}" aria-label="فك ارتباط الجهاز" title="فك ارتباط الجهاز">${IC.unlock}</button>` : ''}
+        <button type="button" class="icon-btn" data-act="editEmp" data-id="${esc(u.id)}" aria-label="تعديل" title="تعديل">${IC.edit}</button>
+        <button type="button" class="icon-btn danger" data-act="delEmp" data-id="${esc(u.id)}" aria-label="حذف" title="حذف">${IC.trash}</button>
+      </td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="6" class="empty"><b>لا يوجد موظفون بعد</b>أضف أول موظف ليستطيع تسجيل حضوره من جواله</td></tr>';
+  return `<section class="panel">
+    <div class="panel-h">
+      <h2>الموظفون <span class="dim" style="font-weight:500">(${list.length})</span></h2>
+      <span class="spacer"></span>
+      ${list.length > 5 ? `<input type="search" class="in" placeholder="بحث بالاسم أو المستخدم" value="${esc(CUR.q)}" data-input="q" aria-label="بحث" style="width:200px">` : ''}
+      <button type="button" class="btn sm" data-act="addEmp">${IC.plus} إضافة موظف</button>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>الموظف</th><th>اسم المستخدم</th><th>الحالة</th><th>الجهاز</th><th>آخر دخول</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+  </section>
+  <p class="note">يدخل الموظف من زر «دخول الموظفين» في شاشة الدخول، ويُربط حسابه بأول جهاز يدخل منه. لتغيير الجهاز اضغط زر القفل بجانب اسمه.</p>`;
+}
+function applySearch() {
+  const q = CUR.q.trim().toLowerCase();
+  $$('#view tr[data-q]').forEach(tr => { tr.hidden = !!q && !tr.dataset.q.includes(q); });
+}
+
+function empModal(id) {
+  const u = id ? ST.attUsers.find(x => x.id === id) : null;
+  if (id && !u) return;
+  const jobs = u && u.job && !JOBS.includes(u.job) ? [u.job, ...JOBS] : JOBS;
+  openM(u ? 'تعديل بيانات موظف' : 'إضافة موظف', `
+    <div class="f"><label for="uName">الاسم الكامل</label><input id="uName" value="${esc(u ? u.name : '')}" autocomplete="off" required></div>
+    <div class="row2">
+      <div class="f"><label for="uJob">الوظيفة</label><select id="uJob">${jobs.map(j => `<option ${(u ? u.job === j : j === 'معلمة') ? 'selected' : ''}>${esc(j)}</option>`).join('')}</select></div>
+      <div class="f"><label for="uJoin">تاريخ الالتحاق</label><input type="date" id="uJoin" value="${esc(u ? (u.joinDate || '') : today())}"></div>
+    </div>
+    <div class="f"><label for="uUser">اسم المستخدم</label><input id="uUser" dir="ltr" value="${esc(u ? u.username || '' : '')}" placeholder="mona123" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="hint">أحرف إنجليزية صغيرة وأرقام فقط</div></div>
+    <div class="f"><label for="uPass">${u ? 'كلمة مرور جديدة' : 'كلمة المرور'}</label>
+      <div class="in-wrap"><input id="uPass" dir="ltr" autocomplete="new-password" placeholder="${u ? 'اتركها فارغة للإبقاء على الحالية' : '٤ أحرف على الأقل'}"><button type="button" class="btn ghost" data-act="genCreds" title="توليد تلقائي">${IC.refresh} توليد</button></div>
+    </div>
+    ${u ? `<div class="f"><label for="uActive">الحالة</label><select id="uActive"><option value="1" ${u.active !== false ? 'selected' : ''}>نشط</option><option value="0" ${u.active === false ? 'selected' : ''}>موقوف</option></select></div>` : ''}
+    <div class="cred" id="uCred" hidden><div id="uCredTxt"></div><button type="button" class="btn ghost sm" data-act="copyCreds">${IC.copy} نسخ</button></div>
+  `, [
+    { label: 'إلغاء', cls: 'ghost', fn: closeM },
+    { label: u ? 'حفظ' : 'إضافة الموظف', primary: true, fn: () => saveEmp(id) }
+  ]);
+}
+function genCreds() {
+  if (!$('#uUser').value.trim()) $('#uUser').value = genUsername($('#uName').value);
+  $('#uPass').value = genPassword();
+  showCreds();
+}
+function showCreds() {
+  const un = $('#uUser').value.trim().toLowerCase(), pw = $('#uPass').value.trim();
+  if (!un || !pw) return;
+  $('#uCredTxt').innerHTML = `اسم المستخدم: <b dir="ltr">${esc(un)}</b><br>كلمة المرور: <b dir="ltr">${esc(pw)}</b><br><span class="dim" style="font-size:12.5px">انسخها الآن وسلّمها للموظف، فلن تظهر مرة أخرى.</span>`;
+  $('#uCred').hidden = false;
+}
+async function copyCreds() {
+  const txt = `${ST.cfg.name}\nاسم المستخدم: ${$('#uUser').value.trim().toLowerCase()}\nكلمة المرور: ${$('#uPass').value.trim()}`;
+  try { await navigator.clipboard.writeText(txt); toast('تم النسخ'); }
+  catch (e) { toast('تعذّر النسخ التلقائي — انسخها يدوياً', true); }
+}
+async function saveEmp(id) {
+  const btn = $('#mForm [type=submit]');
+  const name = $('#uName').value.trim();
+  const username = $('#uUser').value.trim().toLowerCase();
+  const pass = $('#uPass').value.trim();
+  if (!name) return toast('أدخل اسم الموظف', true);
+  if (!username) return toast('أدخل اسم المستخدم أو اضغط «توليد»', true);
+  if (!/^[a-z0-9_.]{3,30}$/.test(username)) return toast('اسم المستخدم: أحرف إنجليزية وأرقام فقط (٣ أحرف على الأقل)', true);
+  if (!id && pass.length < 4) return toast('كلمة المرور ٤ أحرف على الأقل', true);
+  if (id && pass && pass.length < 4) return toast('كلمة المرور ٤ أحرف على الأقل', true);
+  if (ST.attUsers.some(x => (x.username || '').toLowerCase() === username && x.id !== id)) return toast('اسم المستخدم مستخدم لموظف آخر', true);
+  busy(btn, 'جاري الحفظ…');
+  try {
+    const data = { name, job: $('#uJob').value, username, joinDate: $('#uJoin').value || today() };
+    if (id) data.active = $('#uActive').value === '1';
+    if (pass) Object.assign(data, await makePw(pass));
+    if (id) {
+      if (pass) data.pwPlain = FV.delete();
+      await db.collection('attUsers').doc(id).update(data);
+    } else {
+      await db.collection('attUsers').add(Object.assign(data, { active: true, deviceId: null, createdAt: new Date().toISOString() }));
+    }
+    closeM();
+    toast(id ? 'تم حفظ البيانات' : 'تمت إضافة الموظف');
+  } catch (e) { unbusy(btn); toast(e.user ? e.message : errMsg(e), true); }
+}
+async function delEmp(id) {
+  const u = ST.attUsers.find(x => x.id === id);
+  if (!await confirmM('حذف موظف', `سيُحذف حساب «${u ? u.name : ''}» ولن يستطيع الدخول. تبقى سجلات حضوره السابقة محفوظة.\nلإيقافه مؤقتاً استخدم «تعديل» ثم «موقوف».`, 'حذف الحساب')) return;
+  try { await db.collection('attUsers').doc(id).delete(); toast('تم حذف الحساب'); }
+  catch (e) { toast(errMsg(e), true); }
+}
+async function unbindDev(id) {
+  const u = ST.attUsers.find(x => x.id === id);
+  if (!await confirmM('فك ارتباط الجهاز', `سيتمكن «${u ? u.name : ''}» من الدخول من جهاز جديد، ويُربط حسابه به تلقائياً.`, 'فك الارتباط', 'btn')) return;
+  try { await db.collection('attUsers').doc(id).update({ deviceId: null, deviceFp: null, deviceBoundAt: null }); toast('تم فك الارتباط'); }
+  catch (e) { toast(errMsg(e), true); }
+}
+
+/* ==================== الإعدادات ==================== */
+function vSettings() {
+  const c = attCfg(), cfg = ST.cfg;
+  const wd = c.workDays || [0, 1, 2, 3, 4];
+  const hasLoc = c.lat != null && c.lng != null;
+  const tzs = TIMEZONES.some(z => z[0] === c.tz) || !c.tz ? TIMEZONES : [[c.tz, c.tz], ...TIMEZONES];
+  return `
+  <div class="grid2">
+    <section class="panel"><div class="panel-h"><h2>المدرسة</h2></div><div class="panel-b">
+      <div class="f"><label for="sName">اسم المدرسة</label><input id="sName" value="${esc(cfg.name || '')}"></div>
+      <div class="f"><label for="sYear">العام الدراسي</label><input id="sYear" value="${esc(cfg.year || '')}"></div>
+      <div class="f"><label for="sTz">المنطقة الزمنية</label><select id="sTz">${tzs.map(([v, l]) => `<option value="${esc(v)}" ${c.tz === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
+        <div class="hint">تُحسب أوقات الحضور بتوقيت المدرسة وساعة الخادم، فلا يؤثر تغيير ساعة جوال الموظف.</div></div>
+    </div></section>
+    <section class="panel"><div class="panel-h"><h2>الدوام</h2></div><div class="panel-b">
+      <div class="row2">
+        <div class="f"><label for="sIn">بداية الدوام</label><input type="time" id="sIn" value="${esc(c.inTime || '07:00')}"></div>
+        <div class="f"><label for="sOut">نهاية الدوام</label><input type="time" id="sOut" value="${esc(c.outTime || '13:00')}"></div>
+      </div>
+      <div class="f"><label for="sGrace">مهلة التأخر (دقائق)</label><input type="number" id="sGrace" min="0" max="120" inputmode="numeric" value="${num(c.graceMin)}"><div class="hint">من يحضر خلال هذه المهلة لا يُحسب متأخراً.</div></div>
+      <div class="f"><span class="lbl" id="daysLbl">أيام الدوام</span>
+        <div class="days" role="group" aria-labelledby="daysLbl">${AR_DAYS.map((d, i) => `<button type="button" class="day" data-act="toggleDay" data-day="${i}" aria-pressed="${wd.includes(i)}">${d}</button>`).join('')}</div>
+      </div>
+    </div></section>
+    <section class="panel span2"><div class="panel-h"><h2>موقع المدرسة</h2></div><div class="panel-b">
+      <p class="note">لا يُقبل تسجيل الحضور إلا من داخل هذا النطاق. قف داخل المدرسة في مكان مكشوف واضغط «تحديد موقعي الآن».</p>
+      <div class="loc-box">
+        <span class="loc-state ${hasLoc ? 'ok' : 'bad'}" id="locState">${hasLoc ? 'الموقع محدّد' : 'الموقع غير محدّد — لن يتمكن الموظفون من التسجيل'}</span>
+        <span class="spacer"></span>
+        ${hasLoc ? `<a class="link" href="https://www.google.com/maps?q=${num(c.lat)},${num(c.lng)}" target="_blank" rel="noopener">عرض على الخريطة</a>` : ''}
+        <button type="button" class="btn sm" data-act="captureLoc">${IC.pin} تحديد موقعي الآن</button>
+      </div>
+      <div class="row3">
+        <div class="f"><label for="sLat">خط العرض</label><input id="sLat" dir="ltr" inputmode="decimal" value="${c.lat != null ? esc(c.lat) : ''}" placeholder="21.54238"></div>
+        <div class="f"><label for="sLng">خط الطول</label><input id="sLng" dir="ltr" inputmode="decimal" value="${c.lng != null ? esc(c.lng) : ''}" placeholder="39.17297"></div>
+        <div class="f"><label for="sRad">النطاق (متر)</label><input type="number" id="sRad" min="20" max="5000" inputmode="numeric" value="${num(c.radius) || 150}"></div>
+      </div>
+    </div></section>
+  </div>
+  <div class="savebar"><button type="button" class="btn" data-act="saveSettings">${IC.check} حفظ الإعدادات</button></div>`;
+}
+function toggleDay(_, btn) { btn.setAttribute('aria-pressed', btn.getAttribute('aria-pressed') === 'true' ? 'false' : 'true'); }
+async function captureLoc(_, btn) {
+  busy(btn, 'جاري تحديد الموقع…');
+  try {
+    const p = await getBestPos(4);
+    $('#sLat').value = p.lat.toFixed(6);
+    $('#sLng').value = p.lng.toFixed(6);
+    const st = $('#locState');
+    st.className = 'loc-state ok';
+    st.textContent = `تم التحديد بدقة ±${Math.round(p.acc)} م — اضغط «حفظ الإعدادات»`;
+    if (p.acc > 50) toast('الدقة منخفضة. انتقل لمكان مكشوف وأعد المحاولة', true);
+  } catch (e) { toast(e.message, true); }
+  finally { unbusy(btn); }
+}
+async function saveSettings(_, btn) {
+  const inTime = $('#sIn').value || '07:00', outTime = $('#sOut').value || '13:00';
+  if (hm2min(outTime) <= hm2min(inTime)) return toast('نهاية الدوام يجب أن تكون بعد بدايته', true);
+  const workDays = $$('#view .day[aria-pressed=true]').map(b => +b.dataset.day);
+  if (!workDays.length) return toast('حدّد يوم دوام واحداً على الأقل', true);
+  const latV = $('#sLat').value.trim(), lngV = $('#sLng').value.trim();
+  let lat = null, lng = null;
+  if (latV || lngV) {
+    lat = parseFloat(latV); lng = parseFloat(lngV);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return toast('إحداثيات الموقع غير صحيحة', true);
+  }
+  const cfg = {
+    name: $('#sName').value.trim() || 'مدرستي',
+    year: $('#sYear').value.trim(),
+    att: {
+      inTime, outTime, workDays, lat, lng,
+      graceMin: Math.min(120, Math.max(0, Math.round(num($('#sGrace').value)))),
+      radius: Math.min(5000, Math.max(20, Math.round(num($('#sRad').value)) || 150)),
+      tz: $('#sTz').value || 'Asia/Riyadh'
+    }
+  };
+  busy(btn, 'جاري الحفظ…');
+  try {
+    await db.collection('meta').doc('config').set(cfg, { merge: true });
+    ST.cfg = normCfg(Object.assign({}, ST.cfg, cfg));
+    updateHeader();
+    renderView();
+    toast('تم حفظ الإعدادات');
+  } catch (e) { unbusy(btn); toast(errMsg(e), true); }
+}
+
+/* ==================== نافذة منبثقة ==================== */
+let _mActions = [], _mPrevFocus = null, _mOnClose = null;
+function openM(title, body, actions, onClose) {
+  _mPrevFocus = document.activeElement;
+  _mActions = actions;
+  _mOnClose = onClose || null;
+  $('#modal').innerHTML = `
+    <div class="mh"><h2 id="mTitle">${esc(title)}</h2><button type="button" class="icon-btn" data-act="closeM" aria-label="إغلاق">${IC.x}</button></div>
+    <form id="mForm" data-submit="modal" novalidate>
+      <div class="mb">${body}</div>
+      <div class="mf">${actions.map((a, i) => `<button type="${a.primary ? 'submit' : 'button'}" class="btn ${a.cls || ''}" ${a.primary ? '' : `data-act="mAct" data-id="${i}"`}>${esc(a.label)}</button>`).join('')}</div>
+    </form>`;
+  const ov = $('#ov');
+  ov.hidden = false;
+  requestAnimationFrame(() => ov.classList.add('open'));
+  const first = $('#modal .mb').querySelector('input:not([disabled]),select:not([disabled]),textarea');
+  setTimeout(() => (first || $('#modal .mf .btn:last-child')).focus(), 30);
+}
+function closeM() {
+  const ov = $('#ov');
+  if (ov.hidden) return;
+  ov.classList.remove('open');
+  ov.hidden = true;
+  $('#modal').innerHTML = '';
+  const cb = _mOnClose; _mOnClose = null;
+  if (cb) cb();
+  if (_mPrevFocus && document.contains(_mPrevFocus)) _mPrevFocus.focus();
+}
+function confirmM(title, text, okLabel, okCls) {
+  return new Promise(res => {
+    let done = false;
+    const finish = v => { if (done) return; done = true; res(v); };
+    openM(title, `<p style="line-height:1.8;white-space:pre-line">${esc(text)}</p>`, [
+      { label: 'إلغاء', cls: 'ghost', fn: () => { finish(false); closeM(); } },
+      { label: okLabel || 'تأكيد', cls: okCls || 'danger', primary: true, fn: () => { finish(true); closeM(); } }
+    ], () => finish(false));
+  });
+}
+
+/* ==================== الموقع الجغرافي ==================== */
+function distanceM(lat1, lng1, lat2, lng2) {
+  const R = 6371000, toR = x => x * Math.PI / 180;
+  const dLat = toR(lat2 - lat1), dLng = toR(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toR(lat1)) * Math.cos(toR(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+function getPos(timeout) {
+  return new Promise((res, rej) => {
+    if (!navigator.geolocation) return rej(userErr('جهازك لا يدعم تحديد الموقع'));
+    navigator.geolocation.getCurrentPosition(
+      p => res({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }),
+      e => {
+        const m = e.code === 1 ? 'يجب السماح للمتصفح بالوصول إلى موقعك من إعدادات الجهاز' : e.code === 3 ? 'انتهت مهلة تحديد الموقع. انتقل لمكان مكشوف وأعد المحاولة' : 'تعذّر تحديد الموقع. تأكد من تشغيل خدمة الموقع (GPS)';
+        rej(Object.assign(userErr(m), { geoCode: e.code }));
+      },
+      { enableHighAccuracy: true, timeout: timeout || 15000, maximumAge: 0 }
+    );
+  });
+}
+async function getBestPos(tries = 3) {
+  let best = null, lastErr = null;
+  for (let i = 0; i < tries; i++) {
+    try {
+      const p = await getPos(i ? 8000 : 15000);
+      if (!best || p.acc < best.acc) best = p;
+      if (p.acc <= 20) break;
+    } catch (e) { lastErr = e; if (e.geoCode === 1) break; }
+    if (i < tries - 1) await sleep(600);
+  }
+  if (!best) throw lastErr || userErr('تعذّر تحديد الموقع');
+  return best;
+}
+async function verifyLocation() {
+  const c = attCfg();
+  if (c.lat == null || c.lng == null) return { ok: false, reason: 'لم تحدّد الإدارة موقع المدرسة بعد. تواصل معها.' };
+  const pos = await getBestPos(3);
+  const dist = Math.round(distanceM(pos.lat, pos.lng, Number(c.lat), Number(c.lng)));
+  const acc = Math.round(pos.acc || 0);
+  const radius = num(c.radius) || 150;
+  if (dist > radius + Math.min(acc, 30)) return { ok: false, dist, radius, acc };
+  return { ok: true, dist, acc };
+}
+
+/* ==================== شاشة الموظف ==================== */
+function showAttLogin(msg) {
+  showScreen('attScreen');
+  $('#attWrap').innerHTML = `
+    <div class="board board-head"><div class="school">${esc(ST.cfg ? ST.cfg.name : 'مدرستي')}</div><p>دخول الموظفين لتسجيل الحضور والانصراف</p></div>
+    <form class="sheet" data-submit="attLogin" novalidate>
+      <div class="alert" id="attErr" role="alert" ${msg ? '' : 'hidden'}>${esc(msg || '')}</div>
+      <div class="f"><label for="attU">اسم المستخدم</label><input id="attU" dir="ltr" autocomplete="username" autocapitalize="off" spellcheck="false"></div>
+      <div class="f"><label for="attP">كلمة المرور</label><input id="attP" type="password" dir="ltr" autocomplete="current-password"></div>
+      <button class="btn block lg" id="attBtn" type="submit">دخول</button>
+      <button type="button" class="link" data-act="toAdmin">دخول الإدارة</button>
+    </form>`;
+  setTimeout(() => { const i = $('#attU'); if (i) i.focus(); }, 60);
+}
+
+async function attLoginSubmit() {
+  const u = ($('#attU').value || '').trim().toLowerCase();
+  const p = $('#attP').value || '';
+  const err = $('#attErr'); err.hidden = true;
+  if (!u || !p) return showAlert(err, 'أدخل اسم المستخدم وكلمة المرور');
+  const btn = $('#attBtn');
+  busy(btn, 'جاري التحقق…');
+  try {
+    if (!ST.cfg) await loadCfg();
+    // استعلام عن موظف واحد فقط بدلاً من تنزيل جميع الحسابات
+    const snap = await db.collection('attUsers').where('username', '==', u).limit(5).get();
+    let emp = null;
+    for (const d of snap.docs) { const x = { id: d.id, ...d.data() }; if (await checkPw(x, p)) { emp = x; break; } }
+    if (!emp) throw userErr('اسم المستخدم أو كلمة المرور غير صحيحة');
+    if (emp.active === false) throw userErr('هذا الحساب موقوف. راجع الإدارة');
+    const dev = deviceId();
+    if (emp.deviceId && emp.deviceId !== dev) throw userErr('هذا الحساب مرتبط بجهاز آخر.\nاطلب من الإدارة فك الارتباط ثم أعد المحاولة.');
+    if (!emp.deviceId) {
+      const bind = { deviceId: dev, deviceBoundAt: new Date().toISOString() };
+      await withTimeout(db.collection('attUsers').doc(emp.id).update(bind), 12000);
+      Object.assign(emp, bind);
+    }
+    if (emp.pwVer !== 2) { // ترقية تشفير كلمة المرور القديمة
+      try { const up = await makePw(p); await db.collection('attUsers').doc(emp.id).update(Object.assign({}, up, { pwPlain: FV.delete() })); Object.assign(emp, up); delete emp.pwPlain; }
+      catch (e) { console.warn('pw upgrade', e); }
+    }
+    ATT.user = emp;
+    saveSess(emp);
+    await enterAtt();
+  } catch (e) {
+    unbusy(btn);
+    showAlert(err, e.user ? e.message : errMsg(e));
+  }
+}
+
+// مزامنة الساعة مع خادم Firebase: يمنع تسجيل وقت مزيّف بتغيير ساعة الجوال
+async function syncClock(empId) {
+  const ref = db.collection('attUsers').doc(empId);
+  const t0 = Date.now();
+  await withTimeout(ref.update({ lastSeen: FV.serverTimestamp() }), 8000);
+  const t1 = Date.now();
+  const snap = await withTimeout(ref.get({ source: 'server' }), 8000);
+  const ts = snap.get('lastSeen');
+  if (ts && ts.toMillis) CLOCK_OFFSET = ts.toMillis() - Math.round((t0 + t1) / 2);
+}
+
+async function enterAtt() {
+  const [, snap] = await Promise.all([
+    syncClock(ATT.user.id).catch(e => console.warn('clock sync', e)),
+    db.collection('attendance').where('userId', '==', ATT.user.id).get()
+  ]);
+  ATT.recs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  showScreen('attScreen');
+  renderAttScreen();
+}
+
+async function restoreAtt(sess) {
+  try {
+    const d = await db.collection('attUsers').doc(sess.id).get();
+    if (!d.exists) throw 0;
+    const emp = { id: d.id, ...d.data() };
+    if (emp.active === false || !emp.deviceId || emp.deviceId !== deviceId() || String(emp.pwHash || '').slice(0, 12) !== sess.k) throw 0;
+    ATT.user = emp;
+    await enterAtt();
+    return true;
+  } catch (e) {
+    if (e === 0) clearSess();
+    return false;
+  }
+}
+
+function attLogout() {
+  ATT.user = null; ATT.recs = [];
+  clearSess();
+  showAttLogin();
+}
+
+const myToday = () => ATT.recs.find(r => r.date === today());
+
+let _ticker = null, _tickDate = null;
+function stopTicker() { if (_ticker) clearInterval(_ticker); _ticker = null; }
+function startTicker() {
+  stopTicker();
+  _tickDate = today();
+  _ticker = setInterval(() => {
+    const p = zoneParts(nowDate());
+    if (p.date !== _tickDate) return renderAttScreen(); // يوم جديد
+    const c = $('#attClock'), s = $('#attSec'), n = $('#tlNow'), f = $('#tlFill');
+    if (!c) return stopTicker();
+    c.textContent = p.hm; s.textContent = p.sec;
+    const pos = tlPos(hm2min(p.hm));
+    if (n && pos != null) n.style.insetInlineStart = pos + '%';
+    if (f && pos != null) f.style.width = pos + '%';
+  }, 1000);
+}
+function tlPos(m) {
+  const c = attCfg(), s = hm2min(c.inTime), e = hm2min(c.outTime);
+  if (e <= s) return null;
+  return Math.min(100, Math.max(0, (m - s) / (e - s) * 100));
+}
+
+function renderAttScreen() {
+  const u = ATT.user, c = attCfg(), t = today(), rec = myToday();
+  const p = zoneParts(nowDate());
+  const state = !rec ? 'none' : !rec.outTime ? 'in' : 'done';
+  const statusTxt = { none: 'لم تسجّل حضورك اليوم', in: 'أنت في الدوام الآن', done: 'انتهى دوامك اليوم' }[state];
+  const gpsReady = c.lat != null && c.lng != null;
+  const nowPos = tlPos(hm2min(p.hm));
+  const tl = nowPos == null ? '' : `
+    <div class="tl" aria-hidden="true">
+      <div class="tl-track">
+        <i class="tl-fill" id="tlFill" style="width:${nowPos}%"></i>
+        ${rec && rec.inTime ? `<b class="tl-mk in" style="inset-inline-start:${tlPos(hm2min(rec.inTime))}%"></b>` : ''}
+        ${rec && rec.outTime ? `<b class="tl-mk out" style="inset-inline-start:${tlPos(hm2min(rec.outTime))}%"></b>` : ''}
+        <b class="tl-now" id="tlNow" style="inset-inline-start:${nowPos}%"></b>
+      </div>
+      <div class="tl-ends"><span>${esc(c.inTime)} بداية الدوام</span><span>نهاية الدوام ${esc(c.outTime)}</span></div>
+    </div>`;
+
+  const lm = rec ? recLate(rec) : 0;
+  const recap = rec ? `<div class="recap">
+      <div><span>الحضور</span><b style="color:var(--ok)">${esc(rec.inTime || '—')}</b></div>
+      <div><span>الانصراف</span><b style="color:${rec.outTime ? 'var(--bad)' : 'var(--muted)'}">${esc(rec.outTime || '—')}</b></div>
+      <div><span>التأخر</span><b style="color:${lm ? 'var(--warn)' : 'var(--ok)'}">${lm ? lm + ' د' : 'لا يوجد'}</b></div>
+    </div>` : '';
+
+  const action = state === 'none' ? `<button type="button" class="btn block lg" id="punchBtn" data-act="punch" data-id="in">تسجيل الحضور</button>`
+    : state === 'in' ? `<button type="button" class="btn block lg punch-out" id="punchBtn" data-act="punch" data-id="out">تسجيل الانصراف</button>`
+    : `<div class="done-l">تم تسجيل حضورك وانصرافك. يوماً طيباً</div>`;
+
+  const hist = ATT.recs.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 14);
+  const histHTML = hist.length ? `<ul>${hist.map(r => {
+    const l = recLate(r);
+    return `<li>
+      <div class="d"><b>${AR_DAYS[dayOfWeek(r.date)]}</b><span>${fmtDate(r.date)}</span></div>
+      <div class="tm"><span>حضور</span>${esc(r.inTime || '—')}</div>
+      <div class="tm"><span>انصراف</span>${esc(r.outTime || '—')}</div>
+      ${l ? tag('warn', l + 'د') : tag('ok', 'منضبط')}
+    </li>`;
+  }).join('')}</ul>` : '<span class="empty">لا توجد سجلات بعد</span>';
+
+  const hijri = localeDate(nowDate(), 'ar-SA-u-ca-islamic-umalqura', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const greg = localeDate(nowDate(), 'ar-u-ca-gregory-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  $('#attWrap').innerHTML = `
+    <div class="board">
+      <div class="board-top">
+        <div><div class="school">${esc(ST.cfg.name)}</div><div class="who-l">${esc(u.name)}، ${esc(u.job || 'موظف')}</div></div>
+        <button type="button" class="btn chalk sm" data-act="attLogout">خروج</button>
+      </div>
+      <div class="clock"><b id="attClock">${p.hm}</b><span id="attSec">${p.sec}</span></div>
+      <div class="date-l">${esc(hijri)}<span>${esc(greg)}</span></div>
+      ${tl}
+    </div>
+    <div class="sheet">
+      <div class="status s-${state}">${statusTxt}${!isWorkDay(t) ? '<small>ليس يوم دوام</small>' : ''}</div>
+      ${recap}
+      <div class="alert" id="attMsg" hidden></div>
+      ${action}
+      <div class="gps ${gpsReady ? '' : 'off'}">${gpsReady ? `يُقبل التسجيل داخل ${num(c.radius) || 150} م من المدرسة` : 'لم تحدّد الإدارة موقع المدرسة بعد'}</div>
+    </div>
+    <div class="sheet hist"><h2>سجلّي (آخر ١٤ يوماً)</h2>${histHTML}</div>`;
+  startTicker();
+}
+
+async function attPunch(kind) {
+  const btn = $('#punchBtn');
+  const label = kind === 'in' ? 'تسجيل الحضور' : 'تسجيل الانصراف';
+  const msg = (m, ok) => showAlert($('#attMsg'), m, ok);
+  busy(btn, 'جاري تحديد موقعك…');
+  try {
+    try { await syncClock(ATT.user.id); }
+    catch (e) {
+      if (e.code === 'timeout' || e.code === 'unavailable') throw userErr('لا يوجد اتصال بالإنترنت. تحقّق من الاتصال ثم أعد المحاولة');
+      console.warn('clock sync', e);
+    }
+    const loc = await verifyLocation();
+    if (!loc.ok) {
+      unbusy(btn);
+      return msg(loc.reason || `أنت خارج نطاق المدرسة.\nتبعد ${loc.dist} م، والنطاق المسموح ${loc.radius} م (دقة موقعك ±${loc.acc} م).\nاقترب من المدرسة أو انتقل لمكان مكشوف ثم أعد المحاولة.`);
+    }
+    busy(btn, 'جاري الحفظ…');
+    const date = today(), hm = nowHM();
+    let rec = myToday();
+    if (kind === 'in') {
+      if (rec) { renderAttScreen(); return msg('سجّلت حضورك مسبقاً اليوم'); }
+      const ref = db.collection('attendance').doc(ATT.user.id + '_' + date);
+      const ex = await ref.get({ source: 'server' });
+      if (ex.exists) { ATT.recs.push({ id: ex.id, ...ex.data() }); renderAttScreen(); return msg('سجّلت حضورك مسبقاً اليوم'); }
+      const data = { userId: ATT.user.id, userName: ATT.user.name, date, inTime: hm, outTime: '', lateMin: lateMinOf(hm), ts: Date.now(), inAt: FV.serverTimestamp(), inDist: loc.dist, inAcc: loc.acc };
+      await withTimeout(ref.set(data), 15000, 'تعذّر الحفظ بسبب ضعف الاتصال. أعد المحاولة');
+      ATT.recs.push(Object.assign({ id: ref.id }, data, { inAt: null }));
+      renderAttScreen();
+      msg(lateMinOf(hm) ? `تم تسجيل حضورك الساعة ${hm} (تأخر ${lateMinOf(hm)} دقيقة)` : `تم تسجيل حضورك الساعة ${hm}`, true);
+    } else {
+      if (!rec) { renderAttScreen(); return msg('سجّل حضورك أولاً'); }
+      if (rec.outTime) { renderAttScreen(); return msg('سجّلت انصرافك مسبقاً اليوم'); }
+      if (hm2min(hm) < hm2min(attCfg().outTime)) {
+        unbusy(btn);
+        if (!await confirmM('انصراف قبل نهاية الدوام', `نهاية الدوام الساعة ${attCfg().outTime}، والوقت الآن ${hm}. سيُسجَّل انصرافاً مبكراً.`, 'تسجيل الانصراف')) return;
+        busy(btn, 'جاري الحفظ…');
+      }
+      const upd = { outTime: hm, earlyMin: earlyMinOf(hm), workMin: workMinOf(rec.inTime, hm), outAt: FV.serverTimestamp(), outDist: loc.dist };
+      await withTimeout(db.collection('attendance').doc(rec.id).update(upd), 15000, 'تعذّر الحفظ بسبب ضعف الاتصال. أعد المحاولة');
+      Object.assign(rec, upd, { outAt: null });
+      renderAttScreen();
+      msg(`تم تسجيل انصرافك الساعة ${hm}`, true);
+    }
+  } catch (e) {
+    const b = $('#punchBtn');
+    if (b) { unbusy(b); b.textContent = label; }
+    msg(e.user ? e.message : errMsg(e));
+  }
+}
+
+/* ==================== الأحداث (تفويض مركزي) ==================== */
+const ACTIONS = {
+  tab: id => switchTab(id),
+  logout: () => doLogout(),
+  forgot: () => forgotPw(),
+  authMode: id => setAuthMode(id),
+  toEmp: () => { const s = readSess(); if (s) { showScreen('bootScreen'); restoreAtt(s).then(ok => { if (!ok) showAttLogin(); }); } else showAttLogin(); },
+  toAdmin: () => showAuth(),
+  attLogout: () => attLogout(),
+  punch: id => attPunch(id),
+  dayShift: id => { const t = today(); const d = addDays(CUR.recDate || t, +id); CUR.recDate = d >= t ? '' : d; renderView(); },
+  recToday: () => { CUR.recDate = ''; renderView(); },
+  monShift: id => { const cur = today().slice(0, 7); const m = addMonths(CUR.month || cur, +id); CUR.month = m >= cur ? '' : m; renderView(); },
+  monCur: () => { CUR.month = ''; renderView(); },
+  manual: id => recModal(null, id),
+  editRec: id => recModal(id),
+  delRec: id => delRec(id),
+  print: () => printMonthly(),
+  excel: (_, el) => exportMonthly(el),
+  addEmp: () => empModal(null),
+  editEmp: id => empModal(id),
+  delEmp: id => delEmp(id),
+  unbind: id => unbindDev(id),
+  genCreds: () => genCreds(),
+  copyCreds: () => copyCreds(),
+  toggleDay: (id, el) => toggleDay(id, el),
+  captureLoc: (id, el) => captureLoc(id, el),
+  saveSettings: (id, el) => saveSettings(id, el),
+  closeM: () => closeM(),
+  retryMonth: () => { if (unsubMonth) unsubMonth(); unsubMonth = null; if (watchedMonth) delete ST.months[watchedMonth]; watchedMonth = null; renderView(); },
+  mAct: i => { const a = _mActions[+i]; if (a) a.fn(); }
+};
+const CHANGES = {
+  recDate: el => { const t = today(); CUR.recDate = el.value && el.value < t ? el.value : ''; renderView(); },
+  month: el => { const cur = today().slice(0, 7); CUR.month = el.value && el.value < cur ? el.value : ''; renderView(); }
+};
+const INPUTS = { q: el => { CUR.q = el.value; applySearch(); } };
+const SUBMITS = {
+  auth: () => doAuth(),
+  attLogin: () => attLoginSubmit(),
+  modal: () => { const a = _mActions.find(x => x.primary); if (a) a.fn(); }
+};
+
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el || el.disabled) return;
+  const fn = ACTIONS[el.dataset.act];
+  if (fn) { e.preventDefault(); fn(el.dataset.id, el, e); }
+});
+document.addEventListener('change', e => { const el = e.target.closest('[data-change]'); if (el && CHANGES[el.dataset.change]) CHANGES[el.dataset.change](el); });
+document.addEventListener('input', e => { const el = e.target.closest('[data-input]'); if (el && INPUTS[el.dataset.input]) INPUTS[el.dataset.input](el); });
+document.addEventListener('submit', e => { const f = e.target; if (f.dataset && f.dataset.submit) { e.preventDefault(); if (SUBMITS[f.dataset.submit]) SUBMITS[f.dataset.submit](f); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#ov').hidden) closeM(); });
+$('#ov').addEventListener('click', e => { if (e.target.id === 'ov') closeM(); });
+$('#view').addEventListener('focusout', () => {
+  if (!_pendingRender) return;
+  setTimeout(() => {
+    const a = document.activeElement;
+    if (a && $('#view').contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return;
+    _pendingRender = false;
+    renderView();
+  }, 0);
+});
+$('#fEmail').addEventListener('input', () => { $('#authErr').hidden = true; });
+document.addEventListener('visibilitychange', () => {
+  // عند العودة للتطبيق بعد مدة: تحديث شاشة الموظف (قد يكون يوماً جديداً)
+  if (!document.hidden && ATT.user && !$('#attScreen').hidden && $('#punchBtn') && !$('#punchBtn').disabled) renderAttScreen();
+});
+
+/* ==================== الإقلاع ==================== */
+function boot() {
+  const cfgP = loadCfg();
+  let first = true;
+  auth.onAuthStateChanged(async user => {
+    await cfgP;
+    if (PENDING_SIGNUP) return;
+    if (user) {
+      try { await enterAdmin(user); } catch (e) { toast(errMsg(e), true); }
+      first = false;
+      return;
+    }
+    stopAdmin();
+    if (first) {
+      first = false;
+      const s = readSess();
+      if (s) { if (!(await restoreAtt(s))) showAttLogin(); return; }
+    }
+    showAuth();
+  });
+}
+boot();
+</script>
+</body>
+</html>
